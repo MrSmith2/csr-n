@@ -29,6 +29,8 @@ class CSRN:
         self.idx = idx
         self.values = values
         self.level_offsets = level_offsets
+        self._coords_cache = None
+        self._use_cache = True
 
     @classmethod
     def from_coo(cls, coords, values, shape):
@@ -181,6 +183,9 @@ class CSRN:
 
     def _reconstruct_coords(self):
         """Reconstruct the (N, nnz) sorted coordinate matrix."""
+        if self._use_cache and self._coords_cache is not None:
+            return self._coords_cache
+
         N = len(self.shape)
         nnz = self.nnz
         subtree = self._compute_subtree_sizes()
@@ -200,6 +205,8 @@ class CSRN:
             else:
                 coords[k] = chunk
 
+        if self._use_cache:
+            self._coords_cache = coords
         return coords
 
     def to_dense(self):
@@ -274,10 +281,14 @@ class CSRN:
                 np.zeros(0, dtype=np.float64),
                 self.shape,
             )
-        return CSRN(
+        result = CSRN(
             self.shape, self.indptr, self.base, self.idx,
             self.values * scalar, self.level_offsets,
         )
+
+        result._coords_cache = self._coords_cache
+        result._use_cache = self._use_cache
+        return result
 
     def ttv(self, v, mode=0):
         """Tensor times vector along  given mode."""
@@ -308,6 +319,9 @@ class CSRN:
             flat_idx, weights=weighted, minlength=int(np.prod(out_shape))
         )
         return out_flat.reshape(out_shape)
+
+    def ttv_last_native(self, v):
+        pass # TODO 
 
     def ttm(self, A, mode=0):
         """Tensor times matrix along  given mode with dense or sparse A."""
