@@ -320,8 +320,36 @@ class CSRN:
         )
         return out_flat.reshape(out_shape)
 
-    def ttv_last_native(self, v):
-        pass # TODO 
+    def ttv_last_native(self, v, return_sparse=False): 
+        # TODO: docstring, ValuError, filter explicit zeros
+        v = np.asarray(v, dtype=np.float64)
+        N = len(self.shape)
+        out_shape = self.shape[:-1]
+        leaf_start = int(self.level_offsets[N - 1])
+        leaf_end = int(self.level_offsets[N])
+
+        if self.nnz == 0:
+            if N == 1:
+                return 0.0
+            out = CSRN.from_coo(np.zeros((N - 1, 0), dtype=np.int64),
+                                np.zeros(0, dtype=np.float64), out_shape)
+            return out if return_sparse else np.zeros(out_shape, dtype=np.float64)
+
+        last_axis_coords = self.idx[int(self.indptr[leaf_start]):int(self.indptr[leaf_end])]
+        weighted = v[last_axis_coords] * self.values
+        starts = self.indptr[leaf_start:leaf_end].astype(np.intp) - int(self.indptr[leaf_start])
+        reduced = np.add.reduceat(weighted, starts)
+
+        if N == 1:
+            return float(reduced.sum())
+
+        out_indptr = self.indptr[:leaf_start + 1].copy()
+        out_idx = self.idx[:int(self.indptr[leaf_start])].copy()
+        out_base = self.base[:leaf_start].copy()
+        out_base[int(self.level_offsets[N - 2]):leaf_start] -= leaf_start
+        out = CSRN(out_shape, out_indptr, out_base, out_idx, reduced, self.level_offsets[:N].copy())
+
+        return out if return_sparse else out.to_dense()
 
     def ttm(self, A, mode=0):
         """Tensor times matrix along  given mode with dense or sparse A."""
