@@ -321,8 +321,18 @@ class CSRN:
         return out_flat.reshape(out_shape)
 
     def ttv_last_native(self, v, return_sparse=False): 
-        # TODO: docstring, ValuError, filter explicit zeros
+        """Tensor times vector along last mode using CSR-N leaves.
+
+        Note: dense output not filter zeros after contraction
+        """
         v = np.asarray(v, dtype=np.float64)
+
+        if v.ndim != 1:
+            raise ValueError(f"v must be 1D, got shape {v.shape}")
+
+        if v.shape[0] != self.shape[-1]:
+            raise ValueError(f"v.shape[0]={v.shape[0]} != tensor.shape[-1]={self.shape[-1]}")
+
         N = len(self.shape)
         out_shape = self.shape[:-1]
         leaf_start = int(self.level_offsets[N - 1])
